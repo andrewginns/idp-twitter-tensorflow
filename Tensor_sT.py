@@ -3,7 +3,6 @@
 from __future__ import division
 import tensorflow as tf
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 import time
 import cPickle as pickle
@@ -19,22 +18,14 @@ def csv_to_numpy_array(filePath, delimiter):
     return np.genfromtxt(filePath, delimiter=delimiter, dtype=None)
 
 
-"""Checking parameters are valid"""
-dimensions = 50
-path = '%s/%d' % (os.getcwd(), dimensions)
-if os.path.exists(path) is True:
-    xprint('\nDimension folder found')
-else:
-    xprint('\nNo folder found for %d dimensions, please run Create_SVD with required dimensions first' % dimensions)
-
 """Loading test and training data"""
-trainX = pickle.load(open("%s/unlabelled_svd_train.p" % path, "rb"))
+trainX = pickle.load(open("unlabelled_svd_train.p", "rb"))
 trainY = csv_to_numpy_array("labels_svd_train_2col.csv", delimiter=',')
 xprint('\nTraining data')
 xprint(trainX.shape)
 xprint(trainY.shape)
 
-testX = pickle.load(open("%s/unlabelled_svd_test.p" % path, "rb"))
+testX = pickle.load(open("unlabelled_svd_test.p", "rb"))
 testY = csv_to_numpy_array("labels_svd_test_2col.csv", delimiter=',')
 xprint('\nTest data')
 xprint(testX.shape)
@@ -51,7 +42,7 @@ xprint(numLabels)
 
 """Learning rate for optimiser"""
 # numEpochs is the number of iterations
-numEpochs = 200
+numEpochs = 2700
 learningRate = tf.train.exponential_decay(learning_rate=0.0008,
                                           global_step=1,
                                           decay_steps=trainX.shape[0],
@@ -82,23 +73,30 @@ bias = tf.Variable(tf.random_normal([1, numLabels],
 # INITIALIZE our weights and biases
 init_OP = tf.global_variables_initializer()
 
-# PREDICTION ALGORITHM i.e. FEEDFORWARD ALGORITHM
+# Logistic Regression PREDICTION ALGORITHM i.e. FEEDFORWARD ALGORITHM
 apply_weights_OP = tf.matmul(X, weights, name="apply_weights")
 add_bias_OP = tf.add(apply_weights_OP, bias, name="add_bias")
+# Activation function
 activation_OP = tf.nn.sigmoid(add_bias_OP, name="activation")
 
-"""Tensorflow operation for evaluation"""
+"""Tensorflow operation for error measurement"""
 
-# COST FUNCTION i.e. MEAN SQUARED ERROR
+# Loss function COST FUNCTION i.e. MEAN SQUARED ERROR
 cost_OP = tf.nn.l2_loss(activation_OP - yGold, name="squared_error_cost")
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(yGold * tf.log(yGold), axis=[1]))
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=activation_OP, labels=yGold))
 
+error = cost_OP
+# error = cross_entropy
 """Tensorflow operation for optimisation"""
 
 # OPTIMIZATION ALGORITHM i.e. GRADIENT DESCENT
-Optimizer = tf.train.GradientDescentOptimizer(learningRate)
+rate = learningRate
+# rate = 0.05
+# rate = 0.01
 
-training_OP = Optimizer.minimize(cost_OP)
+Optimizer = tf.train.GradientDescentOptimizer(rate)
+
+training_OP = Optimizer.minimize(error)
 
 """Live updating graph"""
 
@@ -116,7 +114,7 @@ ax2 = plt.subplot("212")
 ax2.set_title("TRAINING COST", fontsize=18)
 plt.tight_layout()
 
-"""Running th program"""
+"""Running the program"""
 
 # Create a tensorflow session
 sess = tf.Session()
@@ -124,9 +122,8 @@ sess = tf.Session()
 # Initialize all tensorflow variables
 sess.run(init_OP)
 
-# Ops for vizualization
-# argmax(activation_OP, 1) gives the label our model thought was most likely
-# argmax(yGold, 1) is the correct label
+"""Evaluation of the model"""
+# Compares the predicted label with the actual label held in yGold
 correct_predictions_OP = tf.equal(tf.argmax(activation_OP, 1), tf.argmax(yGold, 1))
 # False is 0 and True is 1, what was our average?
 accuracy_OP = tf.reduce_mean(tf.cast(correct_predictions_OP, "float"))
@@ -142,13 +139,14 @@ biasSummary = tf.summary.histogram("biases", bias.eval(session=sess))
 # Merge all summaries
 all_summary_OPS = tf.summary.merge_all()
 # Summary writer
-writer = tf.summary.FileWriter("summary_logs", sess.graph_def)
+writer = tf.summary.FileWriter("summary_logs", sess.graph)
 
 # Initialize reporting variables
 cost = 0
 diff = 1
 
 # Training epochs
+start = time.time()
 for i in range(numEpochs):
     if i > 1 and diff < .0001:
         print("change in cost %g; convergence." % diff)
@@ -186,10 +184,13 @@ for i in range(numEpochs):
             fig.canvas.draw()
             time.sleep(1)
 
+end = time.time()
 # How well do we perform on held-out test data?
 print("final accuracy on test set: %s" % str(sess.run(accuracy_OP,
                                                       feed_dict={X: testX,
                                                                  yGold: testY})))
+print 'Total time: %f' % (end - start)
+print 'Cost =%s, Learning rate =%s' % (str(cost), str(rate))
 
 """Save trained models"""
 
