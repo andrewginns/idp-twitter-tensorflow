@@ -46,7 +46,7 @@ xprint(numLabels)
 """Learning rate for optimiser"""
 
 # numEpochs is the number of iterations
-numEpochs = 27000
+numEpochs = 2700
 learningRate = tf.train.exponential_decay(learning_rate=0.0008,
                                           global_step=1,
                                           decay_steps=trainX.shape[0],
@@ -97,15 +97,15 @@ activation_OP = tf.nn.sigmoid(add_bias_OP, name="activation")
 
 # Loss function COST FUNCTION i.e. MEAN SQUARED ERROR
 cost_OP = tf.nn.l2_loss(activation_OP - yGold, name="squared_error_cost")
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=activation_OP, labels=yGold))
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=add_bias_OP, labels=yGold))
 
-error = cost_OP
-# error = cross_entropy
+# error = cost_OP
+error = cross_entropy
 """Tensorflow operation for optimisation"""
 
 # OPTIMIZATION ALGORITHM i.e. GRADIENT DESCENT
-rate = learningRate
-# rate = 0.05
+# rate = learningRate
+rate = 0.05
 # rate = 0.01
 
 Optimizer = tf.train.GradientDescentOptimizer(rate)
